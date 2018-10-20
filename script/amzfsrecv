@@ -1,0 +1,15 @@
+#!perl
+
+use App::amzfsrecv
+App::amzfsrecv->run;
+
+__END__
+
+=head1 NAME
+
+amzfsrecv - amfetchdump -p and zfs recv
+
+=head1 SYNOPSYS
+
+ amzfsrecv --dryrun host [disk]
+ amzfsrecv -v host [disk]
