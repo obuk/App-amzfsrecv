@@ -18,11 +18,10 @@ die () {
 
 [ ! -c "/dev/$disk" ] && die "can't open $disk"
 if [ "$zroot" != "$(echo $rootfs |cut -d/ -f1)" ]; then
-    warn WARNING: the 1st part of $rootfs expects $zroot.
     rootfs=$(echo $zroot/$(echo $rootfs |cut -d/ -f2-))
 fi
 
-zpool destroy -f $zroot
+$sudo zpool destroy -f $zroot
 $sudo gpart destroy -F $disk
 
 set -ex
