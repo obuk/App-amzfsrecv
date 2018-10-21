@@ -1,6 +1,6 @@
 package App::amzfsrecv;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 use feature 'say';
 use strict;
@@ -13,6 +13,7 @@ use MooX::Options protect_argv => 0, usage_string => 'USAGE: %c %o host [disk]';
 use Perl6::Slurp;
 
 {
+my $order = 1;
 my $amanda = 'amanda';
 option amanda => (
   is => 'ro', short => 'a', doc => "amanda server: $amanda",
@@ -30,10 +31,14 @@ option dryrun => (
 );
 
 option exact => (
-  is => 'ro', short => 'e', doc => "use amadmin find --exact",
+  is => 'ro', short => 'e', doc => "amadmin find --exact",
 );
 
-my $order = 1;
+option datestmp => (
+  is => 'ro', short => 'f', doc => "amadmin find --before datestmp (if there were)",
+  format => 's',
+  order => $order++,
+);
 
 my $init_sh = 'init.sh';
 option init_sh => (
@@ -123,6 +128,7 @@ sub amfind {
     next unless my ($date, $time, @rest) = split /\s+/;
     next if $date eq 'date';
     (my $datestmp = $date.$time) =~ s/[-:]//g;
+    next if $self->datestmp && ($datestmp cmp $self->datestmp) > 0;
     my $row = { datestmp => $datestmp };
     $row->{$_} = shift @rest for qw/host path lev tape file part status/;
     $skip{$row->{host}}{$row->{path}}{$_}++ for $row->{lev} + 1 .. 9;
@@ -172,14 +178,11 @@ sub amzfsrecv {
     if ($self->verbose) {
       push @opts, '-v';
     }
-    my ($out, $err, $rc) = $self->sh(
+    $self->sh(
       'ssh', $self->amanda, qw/amfetchdump -a -p --exact-match/,
       $self->config, $self->host, $_->{path}, $_->{datestmp}, $_->{lev},
       '|', $self->_sudo, qw/zfs recv/, @opts, '$zroot',
     );
-    if ($err =~ /^(\d+) volume\(s\) needed for restoration$/m) {
-      warn "WARNING: datestmp and lev are not enough\n" unless $1 == 1;
-    }
     my $path = join '/', '$zroot', $_->{path} =~ /\/(.*)/;
     (my $snap = 'amanda-' . $_->{path}) =~ s/\//_/g;
     $self->sh($self->_sudo, qw/zfs rename/, map "$path\@$snap-$_", 'current', $_->{lev});
